@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# hooks.py — Application hooks and event bindings for iraqi_passport
+
 app_name = "iraqi_passport"
 app_title = "Iraqi Passport Management"
 app_publisher = "Ministry of Interior"
@@ -5,260 +8,61 @@ app_description = "Iraqi Passport Issuance Lifecycle Management"
 app_email = "info@example.iq"
 app_license = "mit"
 
-# Apps
-# ------------------
+after_migrate = ["iraqi_passport.hooks.mark_print_format_preview"]
 
-# required_apps = []
 
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "iraqi_passport",
-# 		"logo": "/assets/iraqi_passport/logo.png",
-# 		"title": "Iraqi Passport Management",
-# 		"route": "/iraqi_passport",
-# 		"has_permission": "iraqi_passport.api.permission.has_app_permission"
-# 	}
-# ]
+def mark_print_format_preview():
+    """Mark the illustrative MRZ block as non-official after fixture sync."""
+    import frappe
 
-# Includes in <head>
-# ------------------
+    name = "Iraqi Passport Format"
+    marker = '<div class="mrz-preview-label">PREVIEW ONLY - NOT ICAO 9303</div>'
+    html = frappe.db.get_value("Print Format", name, "html")
+    if html and marker not in html and '<section class="mrz">' in html:
+        html = html.replace('<section class="mrz">', marker + '<section class="mrz">', 1)
+        frappe.db.set_value("Print Format", name, "html", html)
 
-# include js, css files in header of desk.html
-# app_include_css = "/assets/iraqi_passport/css/iraqi_passport.css"
-# app_include_js = "/assets/iraqi_passport/js/iraqi_passport.js"
-
-# include js, css files in header of web template
-# web_include_css = "/assets/iraqi_passport/css/iraqi_passport.css"
-# web_include_js = "/assets/iraqi_passport/js/iraqi_passport.js"
-
-# include custom scss in every website theme (without file extension ".scss")
-# website_theme_scss = "iraqi_passport/public/scss/website"
-
-# include js, css files in header of web form
-# webform_include_js = {"doctype": "public/js/doctype.js"}
-# webform_include_css = {"doctype": "public/css/doctype.css"}
-
-# include js in page
-# page_js = {"page" : "public/js/file.js"}
-
-# include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
-# doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
-
-# Svg Icons
-# ------------------
-# include app icons in desk
-# app_include_icons = "iraqi_passport/public/icons.svg"
-
-# Home Pages
-# ----------
-
-# application home page (will override Website Settings)
-# home_page = "login"
-
-# website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
-
-# Generators
-# ----------
-
-# automatically create page for each record of this doctype
-# website_generators = ["Web Page"]
-
-# automatically load and sync documents of this doctype from downstream apps
-# importable_doctypes = [doctype_1]
-
-# Jinja
-# ----------
-
-# add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "iraqi_passport.utils.jinja_methods",
-# 	"filters": "iraqi_passport.utils.jinja_filters"
-# }
-
-# Installation
-# ------------
-
-# before_install = "iraqi_passport.install.before_install"
-# after_install = "iraqi_passport.install.after_install"
-
-# Uninstallation
-# ------------
-
-# before_uninstall = "iraqi_passport.uninstall.before_uninstall"
-# after_uninstall = "iraqi_passport.uninstall.after_uninstall"
-
-# Integration Setup
-# ------------------
-# To set up dependencies/integrations with other apps
-# Name of the app being installed is passed as an argument
-
-# before_app_install = "iraqi_passport.utils.before_app_install"
-# after_app_install = "iraqi_passport.utils.after_app_install"
-
-# Integration Cleanup
-# -------------------
-# To clean up dependencies/integrations with other apps
-# Name of the app being uninstalled is passed as an argument
-
-# before_app_uninstall = "iraqi_passport.utils.before_app_uninstall"
-# after_app_uninstall = "iraqi_passport.utils.after_app_uninstall"
-
-# Build
-# ------------------
-# To hook into the build process
-
-# after_build = "iraqi_passport.build.after_build"
-
-# Desk Notifications
-# ------------------
-# See frappe.core.notifications.get_notification_config
-
-# notification_config = "iraqi_passport.notifications.get_notification_config"
-
-# Awesome Bar
-# -----------
-# Extra search results: list of dicts with label, description, route, index.
-# route: ["List", "ToDo"], "/desk/docs/some/page", or "https://example.com"
-# awesomebar_search = ["iraqi_passport.search.awesomebar_results"]
-
-# Permissions
-# -----------
-# Permissions evaluated in scripted ways
-
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
-
+# ---------------------------------------------------------------------------
 # Document Events
-# ---------------
-# Hook on document methods and events
+# Controller functions are thin orchestrators that delegate to services.
+# ---------------------------------------------------------------------------
+doc_events = {
+    "Passport Application": {
+        "on_update": "iraqi_passport.passport_management.doctype.passport_application.passport_application.on_application_update",
+    }
+}
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+# ---------------------------------------------------------------------------
+# Permission Hooks
+# has_permission can ONLY deny (return False). Returning None continues standard checks.
+# ---------------------------------------------------------------------------
+has_permission = {
+    "Passport Application": "iraqi_passport.passport_management.permissions.passport_application_permission.has_permission",
+    "Passport": "iraqi_passport.passport_management.permissions.passport_application_permission.has_passport_permission",
+}
 
-# Scheduled Tasks
-# ---------------
+permission_query_conditions = {
+    "Passport Application": "iraqi_passport.passport_management.permissions.passport_application_permission.permission_query_conditions",
+    "Passport": "iraqi_passport.passport_management.permissions.passport_application_permission.passport_query_conditions",
+}
 
-# scheduler_events = {
-# 	"all": [
-# 		"iraqi_passport.tasks.all"
-# 	],
-# 	"daily": [
-# 		"iraqi_passport.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"iraqi_passport.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"iraqi_passport.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"iraqi_passport.tasks.monthly"
-# 	],
-# }
-
-# Testing
-# -------
-
-# before_tests = "iraqi_passport.install.before_tests"
-
-# Extend DocType Class
-# ------------------------------
-#
-# Specify custom mixins to extend the standard doctype controller.
-# extend_doctype_class = {
-# 	"Task": "iraqi_passport.custom.task.CustomTaskMixin"
-# }
-
-# Overriding Methods
-# ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "iraqi_passport.event.get_events"
-# }
-#
-# each overriding function accepts a `data` argument;
-# generated from the base implementation of the doctype dashboard,
-# along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "iraqi_passport.task.get_dashboard_data"
-# }
-
-# exempt linked doctypes from being automatically cancelled
-#
-# auto_cancel_exempted_doctypes = ["Auto Repeat"]
-
-# Ignore links to specified DocTypes when deleting documents
-# -----------------------------------------------------------
-
-# ignore_links_on_delete = ["Communication", "ToDo"]
-
-# Request Events
-# ----------------
-# before_request = ["iraqi_passport.utils.before_request"]
-# after_request = ["iraqi_passport.utils.after_request"]
-
-# Job Events
-# ----------
-# before_job = ["iraqi_passport.utils.before_job"]
-# after_job = ["iraqi_passport.utils.after_job"]
-
-# User Data Protection
-# --------------------
-
-# user_data_fields = [
-# 	{
-# 		"doctype": "{doctype_1}",
-# 		"filter_by": "{filter_by}",
-# 		"redact_fields": ["{field_1}", "{field_2}"],
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_2}",
-# 		"filter_by": "{filter_by}",
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_3}",
-# 		"strict": False,
-# 	},
-# 	{
-# 		"doctype": "{doctype_4}"
-# 	}
-# ]
-
-# Authentication and authorization
-# --------------------------------
-
-# auth_hooks = [
-# 	"iraqi_passport.auth.validate"
-# ]
-
-# Automatically update python controller files with type annotations for this app.
-# export_python_type_annotations = True
-
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
-
-# Translation
-# ------------
-# List of apps whose translatable strings should be excluded from this app's translations.
-# ignore_translatable_strings_from = []
-
+# ---------------------------------------------------------------------------
+# Fixtures — exported for version control and re-import on any site.
+# ---------------------------------------------------------------------------
+fixtures = [
+    {"dt": "Workflow", "filters": [["name", "=", "Passport Approval Workflow"]]},
+    {"dt": "Workflow State", "filters": [["name", "in", [
+        "Draft", "Officer Review", "Manager Review",
+        "Escalated", "Approved", "Rejected", "Returned for Correction"
+    ]]]},
+    {"dt": "Workflow Action Master", "filters": [["name", "in", [
+        "Send for Review", "Verify and Approve", "Return for Correction",
+        "Approve", "Reject", "Escalate", "Final Approve", "Final Reject",
+        "Reset to Draft"
+    ]]]},
+    {"dt": "Role", "filters": [["name", "in", [
+        "Data Entry Clerk", "Verification Officer", "Manager", "Director"
+    ]]]},
+    {"dt": "Notification", "filters": [["document_type", "=", "Passport Application"]]},
+    {"dt": "Print Format", "filters": [["name", "=", "Iraqi Passport Format"]]},
+]

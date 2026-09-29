@@ -4,7 +4,7 @@ authors = [
     { name = "Ministry of Interior", email = "info@example.iq"}
 ]
 description = "Iraqi Passport Issuance Lifecycle Management"
-requires-python = ">=3.14"
+requires-python = ">=3.14,<3.15"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [

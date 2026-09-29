@@ -1,0 +1,23 @@
+{
+ "doctype": "DocType",
+ "name": "Field Verification Remark",
+ "module": "Passport Management",
+ "istable": 1,
+ "engine": "InnoDB",
+ "field_order": ["field_reference", "is_verified", "remark", "verified_by", "verified_on", "is_locked"],
+ "fields": [
+  {"fieldname": "field_reference", "label": "Target Field", "fieldtype": "Select",
+   "options": "full_name_ar\nfull_name_en\ndate_of_birth\nmother_name_ar\nmother_name_en\nfather_name_ar\nfather_name_en\nnational_id\ngender\nplace_of_birth\npersonal_photo\napplicant_signature",
+   "reqd": 1, "in_list_view": 1, "columns": 3},
+  {"fieldname": "is_verified", "label": "Verified", "fieldtype": "Check",
+   "in_list_view": 1, "columns": 1},
+  {"fieldname": "remark", "label": "Remark", "fieldtype": "Small Text",
+   "in_list_view": 1, "columns": 4},
+  {"fieldname": "verified_by", "label": "Verified By", "fieldtype": "Link",
+   "options": "User", "read_only": 1, "in_list_view": 1, "columns": 2},
+  {"fieldname": "verified_on", "label": "Verified On", "fieldtype": "Datetime", "read_only": 1},
+  {"fieldname": "is_locked", "label": "Locked (Previous Cycle)", "fieldtype": "Check",
+   "default": "0", "hidden": 1, "read_only": 1}
+ ],
+ "permissions": []
+}
