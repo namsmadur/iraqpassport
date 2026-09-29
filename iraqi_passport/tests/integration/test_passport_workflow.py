@@ -21,7 +21,10 @@ from iraqi_passport.passport_management.permissions.passport_application_permiss
     has_passport_permission,
     passport_query_conditions,
 )
-from iraqi_passport.passport_management.services.passport_service import PassportService
+from iraqi_passport.passport_management.services.passport_service import (
+    VERIFICATION_FIELDS,
+    PassportService,
+)
 
 
 class TestPassportWorkflowIntegration(IntegrationTestCase):
@@ -280,8 +283,17 @@ class TestPassportWorkflowIntegration(IntegrationTestCase):
         app = frappe.get_doc("Passport Application", app.name)
         app.flags.ignore_mandatory = True
         app.flags.ignore_permissions = True
-        app.append("field_remarks", {"field_reference": "full_name_ar", "is_verified": 1})
+        for field in VERIFICATION_FIELDS:
+            app.append("field_remarks", {
+                "field_reference": field,
+                "is_verified": 1,
+                "remark": f"Verified {field}",
+            })
         app.save()
+        self.assertEqual(
+            {row.field_reference for row in app.field_remarks if row.is_verified and row.remark},
+            set(VERIFICATION_FIELDS),
+        )
         app.flags.ignore_permissions = True
         app = apply_workflow(app, "Verify and Approve")
         self.assertEqual(app.workflow_state, "Manager Review")
@@ -290,8 +302,38 @@ class TestPassportWorkflowIntegration(IntegrationTestCase):
         app = frappe.get_doc("Passport Application", app.name)
         app.flags.ignore_mandatory = True
         app.flags.ignore_permissions = True
+        app = apply_workflow(app, "Send Back to Officer")
+        self.assertEqual(app.workflow_state, "Officer Review")
+        self.assertFalse(any(row.is_verified for row in app.field_remarks))
+
+        frappe.set_user(officer)
+        app = frappe.get_doc("Passport Application", app.name)
+        for row in app.field_remarks:
+            row.is_verified = 1
+        app.flags.ignore_mandatory = True
+        app.flags.ignore_permissions = True
+        app.save()
+        app = apply_workflow(app, "Verify and Approve")
+
+        frappe.set_user(manager)
+        app = frappe.get_doc("Passport Application", app.name)
+        app.flags.ignore_mandatory = True
+        app.flags.ignore_permissions = True
         app = apply_workflow(app, "Approve")
         self.assertEqual(app.workflow_state, "Approved")
+
+    def test_manager_review_requires_all_fields_verified_with_remarks(self):
+        """Every applicant field needs a verified remark before manager review."""
+        app = self._create_draft_application(national_id="100000000015")
+        app.workflow_state = "Manager Review"
+        app.append("field_remarks", {
+            "field_reference": "full_name_ar",
+            "is_verified": 1,
+            "remark": "Name checked",
+        })
+
+        with self.assertRaises(frappe.ValidationError):
+            PassportService().validate_application(app)
 
     def test_expiry_date_is_10_years_after_issue(self):
         """Expiry date must be exactly 10 years after issue date."""

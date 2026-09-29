@@ -12,7 +12,7 @@
   {"fieldname": "is_verified", "label": "Verified", "fieldtype": "Check",
    "in_list_view": 1, "columns": 1},
   {"fieldname": "remark", "label": "Remark", "fieldtype": "Small Text",
-   "in_list_view": 1, "columns": 4},
+    "reqd": 1, "in_list_view": 1, "columns": 4},
   {"fieldname": "verified_by", "label": "Verified By", "fieldtype": "Link",
    "options": "User", "read_only": 1, "in_list_view": 1, "columns": 2},
   {"fieldname": "verified_on", "label": "Verified On", "fieldtype": "Datetime", "read_only": 1},

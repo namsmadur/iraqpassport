@@ -1,0 +1,28 @@
+{
+ "app": "iraqi_passport",
+ "charts": [],
+ "content": "[{\"id\":\"verification-queue-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Verification Queue\",\"col\":12}}]",
+ "custom_blocks": [],
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "check-circle",
+ "is_hidden": 0,
+ "label": "Verification Desk",
+ "links": [
+  {"type": "Card Break", "label": "Verification Queue", "hidden": 0},
+  {"type": "Link", "label": "Passport Applications", "link_type": "DocType",
+   "link_to": "Passport Application", "hidden": 0, "link_count": 0,
+   "is_query_report": 0, "onboard": 0, "dependencies": ""}
+ ],
+ "module": "Passport Management",
+ "name": "Verification Desk",
+ "number_cards": [],
+ "public": 1,
+ "quick_lists": [],
+ "roles": [{"role": "Verification Officer"}],
+ "sequence_id": 1,
+ "shortcuts": [],
+ "title": "Verification Desk",
+ "type": "Workspace"
+}

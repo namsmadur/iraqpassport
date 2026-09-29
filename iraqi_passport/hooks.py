@@ -16,10 +16,18 @@ def mark_print_format_preview():
     import frappe
 
     name = "Iraqi Passport Format"
-    marker = '<div class="mrz-preview-label">PREVIEW ONLY - NOT ICAO 9303</div>'
+    marker = (
+        '<div class="mrz-preview-label" style="border:2px solid #b42318;color:#b42318;'
+        'font-weight:bold;text-align:center;padding:8px;margin-bottom:8mm">'
+        'SAMPLE - NOT A GOVERNMENT DOCUMENT - NOT VALID FOR TRAVEL<br>'
+        'نموذج غير رسمي - غير صالح للسفر</div>'
+    )
     html = frappe.db.get_value("Print Format", name, "html")
-    if html and marker not in html and '<section class="mrz">' in html:
-        html = html.replace('<section class="mrz">', marker + '<section class="mrz">', 1)
+    old_marker = '<div class="mrz-preview-label">PREVIEW ONLY - NOT ICAO 9303</div>'
+    if html and '<header class="passport-header">' in html:
+        html = html.replace(old_marker, "")
+        if marker not in html:
+            html = html.replace('<header class="passport-header">', marker + '<header class="passport-header">', 1)
         frappe.db.set_value("Print Format", name, "html", html)
 
 # ---------------------------------------------------------------------------
@@ -57,6 +65,7 @@ fixtures = [
     ]]]},
     {"dt": "Workflow Action Master", "filters": [["name", "in", [
         "Send for Review", "Verify and Approve", "Return for Correction",
+        "Send Back to Officer",
         "Approve", "Reject", "Escalate", "Final Approve", "Final Reject",
         "Reset to Draft"
     ]]]},

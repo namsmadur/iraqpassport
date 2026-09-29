@@ -19,6 +19,20 @@ ACTIVE_STATES = (
     "Escalated",
     "Returned for Correction",
 )
+VERIFICATION_FIELDS = (
+    "full_name_ar",
+    "full_name_en",
+    "date_of_birth",
+    "mother_name_ar",
+    "mother_name_en",
+    "father_name_ar",
+    "father_name_en",
+    "national_id",
+    "gender",
+    "place_of_birth",
+    "personal_photo",
+    "applicant_signature",
+)
 
 
 class PassportService(BaseService):
@@ -30,6 +44,31 @@ class PassportService(BaseService):
         self._validate_date_of_birth(doc)
         self._validate_photo(doc)
         self._check_duplicate_active_application(doc)
+        self._validate_verification_remarks(doc)
+
+        previous = doc.get_doc_before_save() if not doc.is_new() else None
+        if previous and previous.workflow_state == "Manager Review" and doc.workflow_state == "Officer Review":
+            for row in doc.field_remarks:
+                row.is_verified = 0
+                row.verified_by = None
+                row.verified_on = None
+
+    def _validate_verification_remarks(self, doc):
+        if doc.workflow_state != "Manager Review":
+            return
+
+        verified_fields = {
+            row.field_reference
+            for row in doc.field_remarks
+            if row.is_verified and (row.remark or "").strip()
+        }
+        missing_fields = [field for field in VERIFICATION_FIELDS if field not in verified_fields]
+        if missing_fields:
+            frappe.throw(
+                _("Every application field must have a verification remark before manager review: {0}").format(
+                    ", ".join(missing_fields)
+                )
+            )
 
     def _validate_national_id(self, doc):
         if not doc.national_id:

@@ -125,7 +125,7 @@
     "action": "Verify and Approve",
     "allow_self_approval": 0,
     "allowed": "Verification Officer",
-    "condition": "doc.field_remarks and not [r for r in doc.field_remarks if not r.is_verified]",
+    "condition": null,
     "next_state": "Manager Review",
     "send_email_to_creator": 0,
     "state": "Officer Review",
@@ -143,6 +143,17 @@
     "transition_tasks": null,
     "workflow_builder_id": null
    },
+    {
+     "action": "Send Back to Officer",
+     "allow_self_approval": 0,
+     "allowed": "Manager",
+     "condition": null,
+     "next_state": "Officer Review",
+     "send_email_to_creator": 0,
+     "state": "Manager Review",
+     "transition_tasks": null,
+     "workflow_builder_id": null
+    },
    {
     "action": "Approve",
     "allow_self_approval": 0,

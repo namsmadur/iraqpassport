@@ -1,0 +1,31 @@
+{
+ "app": "iraqi_passport",
+ "charts": [],
+ "content": "[{\"id\":\"manager-review-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Review and Decisions\",\"col\":12}}]",
+ "custom_blocks": [],
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "briefcase",
+ "is_hidden": 0,
+ "label": "Manager Desk",
+ "links": [
+  {"type": "Card Break", "label": "Review and Decisions", "hidden": 0},
+  {"type": "Link", "label": "Passport Applications", "link_type": "DocType",
+   "link_to": "Passport Application", "hidden": 0, "link_count": 0,
+   "is_query_report": 0, "onboard": 0, "dependencies": ""},
+  {"type": "Link", "label": "Issued Passports", "link_type": "DocType",
+   "link_to": "Passport", "hidden": 0, "link_count": 0,
+   "is_query_report": 0, "onboard": 0, "dependencies": ""}
+ ],
+ "module": "Passport Management",
+ "name": "Manager Desk",
+ "number_cards": [],
+ "public": 1,
+ "quick_lists": [],
+ "roles": [{"role": "Manager"}, {"role": "Director"}],
+ "sequence_id": 2,
+ "shortcuts": [],
+ "title": "Manager Desk",
+ "type": "Workspace"
+}
