@@ -3,8 +3,8 @@
   "docstatus": 0,
   "doctype": "Workflow Action Master",
   "modified": "2026-09-16 13:02:22.179612",
-  "name": "Approve",
-  "workflow_action_name": "Approve"
+  "name": "Issue Passport",
+  "workflow_action_name": "Issue Passport"
  },
  {
   "docstatus": 0,
@@ -24,8 +24,8 @@
   "docstatus": 0,
   "doctype": "Workflow Action Master",
   "modified": "2026-09-16 16:26:26.125347",
-  "name": "Verify and Approve",
-  "workflow_action_name": "Verify and Approve"
+  "name": "Verify and Send to Director",
+  "workflow_action_name": "Verify and Send to Director"
  },
  {
   "docstatus": 0,
@@ -33,33 +33,6 @@
   "modified": "2026-09-16 16:26:26.126262",
   "name": "Return for Correction",
   "workflow_action_name": "Return for Correction"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow Action Master",
-  "name": "Send Back to Officer",
-  "workflow_action_name": "Send Back to Officer"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow Action Master",
-  "modified": "2026-09-16 16:26:26.127504",
-  "name": "Escalate",
-  "workflow_action_name": "Escalate"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow Action Master",
-  "modified": "2026-09-16 16:26:26.128266",
-  "name": "Final Approve",
-  "workflow_action_name": "Final Approve"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow Action Master",
-  "modified": "2026-09-16 16:26:26.129042",
-  "name": "Final Reject",
-  "workflow_action_name": "Final Reject"
  },
  {
   "docstatus": 0,

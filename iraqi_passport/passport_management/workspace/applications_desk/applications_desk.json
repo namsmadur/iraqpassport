@@ -1,0 +1,33 @@
+{
+ "app": "iraqi_passport",
+ "charts": [],
+ "content": "[{\"id\":\"draft-applications\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Draft Applications\",\"col\":6}},{\"id\":\"returned-applications\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Returned for Correction\",\"col\":6}}]",
+ "custom_blocks": [],
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "file-text",
+ "is_hidden": 0,
+ "label": "إنشاء جواز عراقي",
+ "links": [
+  {"type": "Card Break", "label": "Applications", "hidden": 0},
+  {"type": "Link", "label": "All Passport Applications", "link_type": "DocType",
+   "link_to": "Passport Application", "hidden": 0, "link_count": 0,
+   "is_query_report": 0, "onboard": 0, "dependencies": ""}
+ ],
+ "module": "Passport Management",
+ "name": "Applications Desk",
+ "number_cards": [],
+ "public": 1,
+ "quick_lists": [
+  {"document_type": "Passport Application", "label": "Draft Applications",
+   "quick_list_filter": "{\"workflow_state\":\"Draft\"}"},
+  {"document_type": "Passport Application", "label": "Returned for Correction",
+   "quick_list_filter": "{\"workflow_state\":\"Returned for Correction\"}"}
+ ],
+ "roles": [{"role": "Data Entry Clerk"}],
+ "sequence_id": 3,
+ "shortcuts": [],
+ "title": "إنشاء جواز عراقي",
+ "type": "Workspace"
+}

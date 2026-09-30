@@ -10,6 +10,12 @@ from frappe.utils import add_years, getdate, today
 class Passport(Document):
     """Passport document controller."""
 
+    OFFICER_EDITABLE_FIELDS = {
+        "full_name_ar", "full_name_en", "date_of_birth", "gender",
+        "mother_name_ar", "mother_name_en", "national_id", "place_of_birth",
+        "personal_photo", "applicant_signature",
+    }
+
     def validate(self):
         if not self.status:
             self.status = "Draft"
@@ -36,7 +42,7 @@ class Passport(Document):
             "passport_number", "issue_date", "expiry_date", "issuing_authority",
             "source_application", "full_name_ar", "full_name_en", "date_of_birth",
             "gender", "mother_name_ar", "mother_name_en", "national_id",
-            "place_of_birth", "personal_photo",
+            "place_of_birth", "personal_photo", "applicant_signature",
         )
         changed_fields = [
             field for field in protected_fields
@@ -46,12 +52,25 @@ class Passport(Document):
             changed_fields = [
                 field for field in changed_fields if field not in ("issue_date", "expiry_date")
             ]
-        if "System Manager" not in roles and changed_fields:
+        officer_edit = (
+            "Verification Officer" in roles
+            and previous.status == "Draft"
+            and self.status == "Draft"
+            and self.source_application == previous.source_application
+            and frappe.db.get_value(
+                "Passport Application", self.source_application, "workflow_state"
+            ) == "Officer Review"
+        )
+        if officer_edit:
+            disallowed = set(changed_fields) - self.OFFICER_EDITABLE_FIELDS
+            if disallowed:
+                frappe.throw(_("Only holder details can be edited during officer review."))
+        elif "System Manager" not in roles and changed_fields:
             frappe.throw(_("Passport details cannot be changed after creation."))
 
     def _validate_approval(self, roles):
-        if "System Manager" not in roles and not ({"Manager", "Director"} & set(roles)):
-            frappe.throw(_("Only a Manager or Director can approve a passport."))
+        if "System Manager" not in roles and "Director" not in roles:
+            frappe.throw(_("Only the Director General can approve a passport."))
         if not self.issue_date or not self.expiry_date:
             frappe.throw(_("Issue date and expiry date are required for an approved passport."))
         if getdate(self.expiry_date) <= getdate(self.issue_date):
@@ -86,3 +105,33 @@ def get_mrz_lines(doc):
         + pad(doc.national_id, 14)
     )
     return f"{line1}\n{line2}"
+
+
+@frappe.whitelist()
+def download_passport_pdf(name):
+    """Render an approved passport with the installed WeasyPrint backend."""
+    passport = frappe.get_doc("Passport", name)
+    passport.check_permission("print")
+    if passport.status != "Approved":
+        frappe.throw(_("Only approved passports can be downloaded as PDF."))
+
+    html = frappe.get_print(
+        "Passport",
+        passport.name,
+        print_format="Iraqi Passport Format",
+        doc=passport,
+        as_pdf=False,
+        no_letterhead=1,
+    )
+    try:
+        from weasyprint import HTML
+        from frappe.utils.pdf import inline_private_images
+
+        html = inline_private_images(html)
+        pdf = HTML(string=html, base_url=frappe.utils.get_url()).write_pdf()
+    except (ImportError, OSError) as exc:
+        frappe.throw(_("The PDF renderer is unavailable: {0}").format(str(exc)))
+
+    frappe.local.response.filename = f"{passport.name}.pdf"
+    frappe.local.response.filecontent = pdf
+    frappe.local.response.type = "pdf"

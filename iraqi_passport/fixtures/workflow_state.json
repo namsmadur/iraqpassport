@@ -40,18 +40,9 @@
   "doctype": "Workflow State",
   "icon": "",
   "modified": "2026-09-16 16:26:26.088073",
-  "name": "Manager Review",
+  "name": "Director Review",
   "style": "",
-  "workflow_state_name": "Manager Review"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
-  "icon": "",
-  "modified": "2026-09-16 16:26:26.092806",
-  "name": "Escalated",
-  "style": "",
-  "workflow_state_name": "Escalated"
+  "workflow_state_name": "Director Review"
  },
  {
   "docstatus": 0,

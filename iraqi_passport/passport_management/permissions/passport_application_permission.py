@@ -6,45 +6,59 @@ import frappe
 
 
 def has_permission(doc, ptype, user):
-    """Check whether a user is allowed to access a Passport Application document.
-
-    This function is used by Frappe when a user tries to read, write, create,
-    or delete a Passport Application record.
-
-    Rules:
-    - Approved or Rejected applications can only be changed by System Manager.
-    - A Data Entry Clerk can manage only the applications they created.
-    - Users in workflow-related roles can access records matching their review state.
-    - All other decisions are left to Frappe's role permission checks.
-    """
-    roles = frappe.get_roles(user)
-
-    # Prevent non-admin users from modifying applications that are already closed.
-    if doc and doc.workflow_state in ("Approved", "Rejected"):
-        if ptype in ("write", "create", "delete"):
-            if "System Manager" not in roles:
-                return False
-
-    # Users in Data Entry Clerk role can only edit or read their own submitted record.
-    if (
-        doc
-        and ptype in ("read", "write")
-        and "Data Entry Clerk" in roles
-        and doc.owner == user
-    ):
+    """Restrict application access to the role responsible for each workflow step."""
+    roles = set(frappe.get_roles(user))
+    if "System Manager" in roles:
         return True
 
-    # Match the workflow state with the required role for review stages.
-    state_roles = {
-        "Officer Review": "Verification Officer",
-        "Manager Review": "Manager",
-        "Escalated": "Director",
-    }
-    if doc and ptype in ("read", "write") and state_roles.get(doc.workflow_state) in roles:
-        return True
+    if ptype == "create":
+        return "Data Entry Clerk" in roles
+    if ptype == "delete":
+        return False
+    if not doc:
+        return None
 
-    # Frappe treats a falsy controller-hook result as an explicit denial.
-    return True
+    state = doc.workflow_state
+    owner = doc.owner == user
+    if ptype == "read":
+        if "Data Entry Clerk" in roles:
+            return owner
+        if "Verification Officer" in roles:
+            return state == "Officer Review"
+        if "Director" in roles:
+            return state in ("Director Review", "Approved", "Rejected")
+        return "Manager" in roles
+
+    if ptype == "write":
+        # File uploads on a new Desk form check write access before the document exists.
+        if doc.is_new():
+            return "Data Entry Clerk" in roles
+
+        saved = frappe.db.get_value(
+            "Passport Application",
+            doc.name,
+            ["owner", "workflow_state"],
+            as_dict=True,
+        )
+        if not saved:
+            return False
+        owner = saved.owner == user
+        saved_state = saved.workflow_state
+        if "Data Entry Clerk" in roles:
+            return owner and (
+                (saved_state == "Draft" and state in ("Draft", "Officer Review"))
+                or (
+                    saved_state == "Returned for Correction"
+                    and state in ("Returned for Correction", "Draft")
+                )
+            )
+        if "Verification Officer" in roles:
+            return state == "Officer Review" or saved_state == "Officer Review"
+        if "Director" in roles:
+            return state == "Director Review" or saved_state == "Director Review"
+        return False
+
+    return None
 
 
 def permission_query_conditions(user):
@@ -58,8 +72,13 @@ def permission_query_conditions(user):
 
     roles = frappe.get_roles(user)
 
-    # Restrict Data Entry Clerk to records they created, unless they are a System Manager.
-    if "Data Entry Clerk" in roles and "System Manager" not in roles:
+    if "System Manager" in roles:
+        return ""
+    if "Director" in roles:
+        return "`tabPassport Application`.workflow_state in ('Director Review', 'Approved', 'Rejected')"
+    if "Verification Officer" in roles:
+        return "`tabPassport Application`.workflow_state = 'Officer Review'"
+    if "Data Entry Clerk" in roles:
         return "`tabPassport Application`.owner = {0}".format(
             frappe.db.escape(user)
         )
@@ -69,16 +88,46 @@ def permission_query_conditions(user):
 
 
 def has_passport_permission(doc, ptype, user):
-    """Restrict passport creation, approval, and deletion by role."""
+    """Allow officers to edit drafts during verification and Directors to issue them."""
     roles = set(frappe.get_roles(user))
-    if ptype == "create" and not roles.intersection({"System Manager", "Data Entry Clerk"}):
+    if "System Manager" in roles:
+        return True
+    if ptype == "create":
         return False
-    if ptype == "write" and not roles.intersection({"System Manager", "Manager", "Director"}):
+    if ptype == "write":
+        if "Director" in roles:
+            return False
+        if "Verification Officer" in roles and doc:
+            application_state = frappe.db.get_value(
+                "Passport Application", doc.source_application, "workflow_state"
+            ) if doc.source_application else None
+            return doc.status == "Draft" and application_state == "Officer Review"
         return False
-    if ptype == "delete" and "System Manager" not in roles:
+    if ptype == "print":
+        return bool(
+            doc
+            and doc.status == "Approved"
+            and roles.intersection({"Director", "Manager"})
+        )
+    if ptype == "delete":
         return False
-
-    return True
+    if ptype == "read":
+        if "Data Entry Clerk" in roles:
+            return False
+        if not doc:
+            return None
+        if "Verification Officer" in roles and doc:
+            state = frappe.db.get_value(
+                "Passport Application", doc.source_application, "workflow_state"
+            ) if doc.source_application else None
+            return doc.status == "Draft" and state == "Officer Review"
+        if "Director" in roles and doc:
+            state = frappe.db.get_value(
+                "Passport Application", doc.source_application, "workflow_state"
+            ) if doc.source_application else None
+            return doc.status == "Approved" or state == "Director Review"
+        return "Manager" in roles
+    return None
 
 
 def passport_query_conditions(user):
@@ -92,11 +141,14 @@ def passport_query_conditions(user):
 
     roles = frappe.get_roles(user)
 
-    # Limit Data Entry Clerk to the Passport records created from their own applications.
-    if "Data Entry Clerk" in roles and "System Manager" not in roles:
-        return "`tabPassport`.source_application in (select name from `tabPassport Application` where owner = {0})".format(
-            frappe.db.escape(user)
-        )
+    if "System Manager" in roles:
+        return ""
+    if "Data Entry Clerk" in roles:
+        return "1=0"
+    if "Verification Officer" in roles:
+        return "`tabPassport`.status = 'Draft' and `tabPassport`.source_application in (select name from `tabPassport Application` where workflow_state = 'Officer Review')"
+    if "Director" in roles:
+        return "(`tabPassport`.status = 'Approved' or `tabPassport`.source_application in (select name from `tabPassport Application` where workflow_state = 'Director Review'))"
 
     # No custom filter for roles that should see everything.
     return ""

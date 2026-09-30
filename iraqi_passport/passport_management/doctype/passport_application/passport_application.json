@@ -12,7 +12,7 @@
   "mother_name_ar", "mother_name_en",
   "father_name_ar", "father_name_en",
   "national_id", "place_of_birth",
-  "section_photos", "personal_photo", "applicant_signature",
+  "section_photos", "personal_photo", "section_signature", "applicant_signature",
   "section_verification", "field_remarks",
   "section_result", "generated_passport", "rejection_reason"
  ],
@@ -38,21 +38,23 @@
   {"fieldname": "place_of_birth", "label": "Place of Birth", "fieldtype": "Data"},
   {"fieldname": "section_photos", "fieldtype": "Section Break", "label": "Photos"},
   {"fieldname": "personal_photo", "label": "Personal Photo", "fieldtype": "Attach Image", "reqd": 1},
-  {"fieldname": "applicant_signature", "label": "Applicant Signature", "fieldtype": "Attach Image"},
+  {"fieldname": "section_signature", "fieldtype": "Section Break", "label": "Applicant Signature / التوقيع"},
+  {"fieldname": "applicant_signature", "label": "Applicant Signature / توقيع مقدم الطلب", "fieldtype": "Signature"},
   {"fieldname": "section_verification", "fieldtype": "Section Break", "label": "Verification"},
   {"fieldname": "field_remarks", "label": "Verification Remarks", "fieldtype": "Table",
-   "options": "Field Verification Remark"},
+   "options": "Field Verification Remark",
+   "description": "During Officer Review, verify every populated field and enter a remark for it before sending to the Director General."},
   {"fieldname": "section_result", "fieldtype": "Section Break", "label": "Result"},
   {"fieldname": "generated_passport", "label": "Generated Passport", "fieldtype": "Link",
    "options": "Passport", "read_only": 1, "no_copy": 1},
-  {"fieldname": "rejection_reason", "label": "Rejection / Return Reason", "fieldtype": "Small Text",
-   "read_only": 1, "no_copy": 1}
+  {"fieldname": "rejection_reason", "label": "Decision / Return Reason", "fieldtype": "Small Text",
+   "no_copy": 1}
  ],
  "permissions": [
   {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
   {"role": "Data Entry Clerk", "read": 1, "write": 1, "create": 1},
   {"role": "Verification Officer", "read": 1, "write": 1},
-  {"role": "Manager", "read": 1, "write": 1},
+  {"role": "Manager", "read": 1},
   {"role": "Director", "read": 1, "write": 1}
  ]
 }

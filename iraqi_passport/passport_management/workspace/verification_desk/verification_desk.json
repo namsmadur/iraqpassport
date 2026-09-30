@@ -1,17 +1,17 @@
 {
  "app": "iraqi_passport",
  "charts": [],
- "content": "[{\"id\":\"verification-queue-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Verification Queue\",\"col\":12}}]",
+ "content": "[{\"id\":\"verification-queue\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Applications Ready for Officer Review\",\"col\":12}}]",
  "custom_blocks": [],
  "doctype": "Workspace",
  "for_user": "",
  "hide_custom": 0,
  "icon": "check-circle",
  "is_hidden": 0,
- "label": "Verification Desk",
+ "label": "الضابط",
  "links": [
-  {"type": "Card Break", "label": "Verification Queue", "hidden": 0},
-  {"type": "Link", "label": "Passport Applications", "link_type": "DocType",
+  {"type": "Card Break", "label": "Officer Review Queue", "hidden": 0},
+  {"type": "Link", "label": "All Passport Applications", "link_type": "DocType",
    "link_to": "Passport Application", "hidden": 0, "link_count": 0,
    "is_query_report": 0, "onboard": 0, "dependencies": ""}
  ],
@@ -19,10 +19,13 @@
  "name": "Verification Desk",
  "number_cards": [],
  "public": 1,
- "quick_lists": [],
+ "quick_lists": [
+  {"document_type": "Passport Application", "label": "Applications Ready for Officer Review",
+   "quick_list_filter": "{\"workflow_state\":\"Officer Review\"}"}
+ ],
  "roles": [{"role": "Verification Officer"}],
- "sequence_id": 1,
+ "sequence_id": 2,
  "shortcuts": [],
- "title": "Verification Desk",
+ "title": "الضابط",
  "type": "Workspace"
 }

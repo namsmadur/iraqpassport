@@ -278,21 +278,27 @@ class TestPassportWorkflowIntegration(IntegrationTestCase):
         self.assertTrue(app.has_permission("read"))
         app = apply_workflow(app, "Send for Review")
         self.assertEqual(app.workflow_state, "Officer Review")
+        expected_fields = {field for field in VERIFICATION_FIELDS if app.get(field)}
+        self.assertEqual(
+            {row.field_reference for row in app.field_remarks},
+            expected_fields,
+        )
+        self.assertEqual(
+            {row.field_reference: row.field_value for row in app.field_remarks},
+            {field: str(app.get(field)) for field in expected_fields},
+        )
 
         frappe.set_user(officer)
         app = frappe.get_doc("Passport Application", app.name)
         app.flags.ignore_mandatory = True
         app.flags.ignore_permissions = True
-        for field in VERIFICATION_FIELDS:
-            app.append("field_remarks", {
-                "field_reference": field,
-                "is_verified": 1,
-                "remark": f"Verified {field}",
-            })
+        for row in app.field_remarks:
+            row.is_verified = 1
+            row.remark = f"Verified {row.field_reference}"
         app.save()
         self.assertEqual(
             {row.field_reference for row in app.field_remarks if row.is_verified and row.remark},
-            set(VERIFICATION_FIELDS),
+            expected_fields,
         )
         app.flags.ignore_permissions = True
         app = apply_workflow(app, "Verify and Approve")
@@ -301,6 +307,9 @@ class TestPassportWorkflowIntegration(IntegrationTestCase):
         frappe.set_user(manager)
         app = frappe.get_doc("Passport Application", app.name)
         app.flags.ignore_mandatory = True
+        app.flags.ignore_permissions = True
+        app.rejection_reason = "Please recheck the submitted identity details."
+        app.save()
         app.flags.ignore_permissions = True
         app = apply_workflow(app, "Send Back to Officer")
         self.assertEqual(app.workflow_state, "Officer Review")
@@ -323,17 +332,86 @@ class TestPassportWorkflowIntegration(IntegrationTestCase):
         self.assertEqual(app.workflow_state, "Approved")
 
     def test_manager_review_requires_all_fields_verified_with_remarks(self):
-        """Every applicant field needs a verified remark before manager review."""
+        """Locked remarks from old cycles cannot satisfy new verification."""
         app = self._create_draft_application(national_id="100000000015")
         app.workflow_state = "Manager Review"
-        app.append("field_remarks", {
-            "field_reference": "full_name_ar",
-            "is_verified": 1,
-            "remark": "Name checked",
-        })
+        for field in VERIFICATION_FIELDS:
+            if app.get(field):
+                app.append("field_remarks", {
+                    "field_reference": field,
+                    "is_verified": 1,
+                    "remark": f"Previous check for {field}",
+                    "is_locked": 1,
+                })
 
         with self.assertRaises(frappe.ValidationError):
             PassportService().validate_application(app)
+
+    def test_manager_must_enter_reason_before_return_or_rejection(self):
+        """A reason is required when a manager rejects or returns an application."""
+        app = self._create_draft_application(national_id="100000000017")
+        frappe.db.set_value("Passport Application", app.name, "workflow_state", "Manager Review")
+        app = frappe.get_doc("Passport Application", app.name)
+        manager = self._ensure_user("passport-reason-manager@example.com", "Manager")
+        frappe.set_user(manager)
+        app.flags.ignore_mandatory = True
+
+        with self.assertRaises(frappe.ValidationError):
+            apply_workflow(app, "Return for Correction")
+
+    def test_correction_resubmission_creates_fresh_verification_rows(self):
+        """Resubmitted applications retain locked history and get fresh checks."""
+        clerk = self._ensure_user("passport-resubmit-clerk@example.com", "Data Entry Clerk")
+        officer = self._ensure_user("passport-resubmit-officer@example.com", "Verification Officer")
+        manager = self._ensure_user("passport-resubmit-manager@example.com", "Manager")
+
+        frappe.set_user(clerk)
+        app = self._create_draft_application(national_id="100000000016")
+        app.flags.ignore_mandatory = True
+        app = apply_workflow(app, "Send for Review")
+
+        frappe.set_user(officer)
+        app = frappe.get_doc("Passport Application", app.name)
+        app.flags.ignore_mandatory = True
+        for row in app.field_remarks:
+            row.is_verified = 1
+            row.remark = f"Checked {row.field_reference}"
+        app.flags.ignore_permissions = True
+        app.save()
+        app = apply_workflow(app, "Verify and Approve")
+
+        frappe.set_user(manager)
+        app = frappe.get_doc("Passport Application", app.name)
+        app.flags.ignore_mandatory = True
+        app.flags.ignore_permissions = True
+        app.rejection_reason = "Please correct the verified application details."
+        app.save()
+        app.flags.ignore_permissions = True
+        app = apply_workflow(app, "Return for Correction")
+        app = frappe.get_doc("Passport Application", app.name)
+        self.assertTrue(all(row.get("is_locked") for row in app.field_remarks))
+
+        frappe.set_user(clerk)
+        app = frappe.get_doc("Passport Application", app.name)
+        app.flags.ignore_mandatory = True
+        app = apply_workflow(app, "Reset to Draft")
+        app.full_name_en = "Corrected Applicant"
+        app.flags.ignore_mandatory = True
+        app.save()
+        app = apply_workflow(app, "Send for Review")
+
+        locked_fields = {
+            row.field_reference for row in app.field_remarks if row.get("is_locked")
+        }
+        active_fields = {
+            row.field_reference for row in app.field_remarks if not row.get("is_locked")
+        }
+        expected_fields = {field for field in VERIFICATION_FIELDS if app.get(field)}
+        self.assertEqual(locked_fields, expected_fields)
+        self.assertEqual(active_fields, expected_fields)
+        self.assertFalse(
+            any(row.is_verified for row in app.field_remarks if not row.get("is_locked"))
+        )
 
     def test_expiry_date_is_10_years_after_issue(self):
         """Expiry date must be exactly 10 years after issue date."""

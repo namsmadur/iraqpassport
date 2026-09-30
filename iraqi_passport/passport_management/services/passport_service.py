@@ -12,11 +12,11 @@ from iraqi_passport.passport_management.services.base_service import BaseService
 
 ALLOWED_PHOTO_EXT = {".jpg", ".jpeg", ".png"}
 MAX_PHOTO_SIZE_MB = 2
+MAX_VERIFICATION_VALUE_LENGTH = 140
 ACTIVE_STATES = (
     "Draft",
     "Officer Review",
-    "Manager Review",
-    "Escalated",
+    "Director Review",
     "Returned for Correction",
 )
 VERIFICATION_FIELDS = (
@@ -33,6 +33,7 @@ VERIFICATION_FIELDS = (
     "personal_photo",
     "applicant_signature",
 )
+APPLICATION_DATA_FIELDS = (*VERIFICATION_FIELDS, "father_name_ar", "father_name_en")
 
 
 class PassportService(BaseService):
@@ -44,30 +45,98 @@ class PassportService(BaseService):
         self._validate_date_of_birth(doc)
         self._validate_photo(doc)
         self._check_duplicate_active_application(doc)
-        self._validate_verification_remarks(doc)
 
         previous = doc.get_doc_before_save() if not doc.is_new() else None
-        if previous and previous.workflow_state == "Manager Review" and doc.workflow_state == "Officer Review":
+        current_roles = set(frappe.get_roles())
+        if (
+            previous
+            and previous.workflow_state == "Director Review"
+            and "Director" in current_roles
+            and "System Manager" not in current_roles
+        ):
+            changed_fields = [
+                field for field in APPLICATION_DATA_FIELDS
+                if doc.get(field) != previous.get(field)
+            ]
+            if changed_fields:
+                frappe.throw(
+                    _(
+                        "The Director General can make the final decision but cannot alter "
+                        "verified applicant details."
+                    )
+                )
+
+        if (
+            previous
+            and previous.workflow_state in ("Officer Review", "Director Review")
+            and doc.workflow_state == "Returned for Correction"
+        ):
             for row in doc.field_remarks:
-                row.is_verified = 0
-                row.verified_by = None
-                row.verified_on = None
+                row.set("is_locked", 1)
+
+        if doc.workflow_state == "Officer Review" and previous:
+            active_references = {
+                row.field_reference for row in doc.field_remarks if not row.get("is_locked")
+            }
+            for field in VERIFICATION_FIELDS:
+                if doc.get(field) and field not in active_references:
+                    doc.append("field_remarks", {"field_reference": field})
+                    active_references.add(field)
+
+        for row in doc.field_remarks:
+            if not row.get("is_locked") and row.field_reference:
+                value = doc.get(row.field_reference)
+                if row.field_reference == "applicant_signature" and value:
+                    value = _("Signature provided")
+                elif row.field_reference == "personal_photo" and value:
+                    value = _("Photo attached")
+
+                value = str(value) if value is not None else ""
+                if len(value) > MAX_VERIFICATION_VALUE_LENGTH:
+                    value = value[: MAX_VERIFICATION_VALUE_LENGTH - 3] + "..."
+                row.field_value = value
+
+        if (
+            previous
+            and previous.workflow_state == "Director Review"
+            and doc.workflow_state == "Officer Review"
+        ):
+            for row in doc.field_remarks:
+                if not row.get("is_locked"):
+                    row.is_verified = 0
+                    row.verified_by = None
+                    row.verified_on = None
+
+        if (
+            previous
+            and previous.workflow_state in ("Officer Review", "Director Review")
+            and doc.workflow_state in ("Returned for Correction", "Rejected")
+            and not (doc.rejection_reason or "").strip()
+        ):
+            frappe.throw(_("Enter a reason before rejecting or returning an application."))
+
+        self._validate_verification_remarks(doc)
 
     def _validate_verification_remarks(self, doc):
-        if doc.workflow_state != "Manager Review":
+        if doc.workflow_state != "Director Review":
             return
 
+        required_fields = [field for field in VERIFICATION_FIELDS if doc.get(field)]
         verified_fields = {
             row.field_reference
             for row in doc.field_remarks
-            if row.is_verified and (row.remark or "").strip()
+            if not row.get("is_locked") and row.is_verified and (row.remark or "").strip()
         }
-        missing_fields = [field for field in VERIFICATION_FIELDS if field not in verified_fields]
+        missing_fields = [field for field in required_fields if field not in verified_fields]
         if missing_fields:
+            meta = frappe.get_meta("Passport Application")
+            missing_labels = [
+                _(meta.get_field(field).label or field) for field in missing_fields
+            ]
             frappe.throw(
-                _("Every application field must have a verification remark before manager review: {0}").format(
-                    ", ".join(missing_fields)
-                )
+                _(
+                    "Before sending to Director Review, mark each populated field as verified and enter a remark: {0}"
+                ).format(", ".join(missing_labels))
             )
 
     def _validate_national_id(self, doc):
@@ -122,7 +191,11 @@ class PassportService(BaseService):
             )
 
     def generate_passport(self, app_doc):
-        """Create a Passport record and back-link it to the application."""
+        """Issue the draft Passport linked to an approved application."""
+        if app_doc.workflow_state != "Approved":
+            frappe.throw(_("A passport can only be generated from an approved application."))
+        if not set(frappe.get_roles()).intersection({"System Manager", "Director"}):
+            frappe.throw(_("Only the Director General can issue a passport."))
         existing_name = frappe.db.get_value(
             "Passport", {"source_application": app_doc.name}, "name"
         )
@@ -149,17 +222,9 @@ class PassportService(BaseService):
             "issue_date": issue_date,
             "expiry_date": expiry_date,
             "source_application": app_doc.name,
-            "full_name_ar": app_doc.full_name_ar,
-            "full_name_en": app_doc.full_name_en,
-            "date_of_birth": app_doc.date_of_birth,
-            "gender": app_doc.gender,
-            "mother_name_ar": app_doc.mother_name_ar,
-            "mother_name_en": app_doc.mother_name_en,
-            "national_id": app_doc.national_id,
-            "place_of_birth": app_doc.place_of_birth,
-            "personal_photo": app_doc.personal_photo,
             "issuing_authority": "Republic of Iraq - Ministry of Interior",
         })
+        self._copy_application_data(app_doc, passport)
         try:
             passport.insert(ignore_permissions=True)
         except frappe.DuplicateEntryError:
@@ -182,6 +247,40 @@ class PassportService(BaseService):
         )
         return passport
 
+    def create_draft_passport(self, app_doc, refresh_existing=False):
+        """Create or refresh a passport draft when an application reaches officer review."""
+        if app_doc.workflow_state != "Officer Review":
+            return None
+
+        existing_name = frappe.db.get_value(
+            "Passport", {"source_application": app_doc.name}, "name"
+        )
+        if existing_name:
+            passport = frappe.get_doc("Passport", existing_name)
+            if passport.status == "Draft" and refresh_existing:
+                self._copy_application_data(app_doc, passport)
+                passport.save(ignore_permissions=True)
+        else:
+            passport = frappe.get_doc({
+                "doctype": "Passport",
+                "passport_number": self._generate_passport_number(),
+                "status": "Draft",
+                "source_application": app_doc.name,
+                "issuing_authority": "Republic of Iraq - Ministry of Interior",
+            })
+            self._copy_application_data(app_doc, passport)
+            passport.insert(ignore_permissions=True)
+
+        frappe.db.set_value(
+            "Passport Application", app_doc.name, "generated_passport", passport.name
+        )
+        app_doc.generated_passport = passport.name
+        return passport
+
+    def _copy_application_data(self, app_doc, passport):
+        for field in VERIFICATION_FIELDS:
+            passport.set(field, app_doc.get(field))
+
     def validate_locked_remarks(self, doc):
         if doc.is_new():
             return
@@ -191,15 +290,18 @@ class PassportService(BaseService):
         deleted_locked = [
             row.name
             for row in previous.field_remarks
-            if row.is_locked and row.name not in current_names
+            if row.get("is_locked") and row.name not in current_names
         ]
         if deleted_locked:
             frappe.throw(_("Locked verification remarks cannot be deleted."))
 
         for row in doc.field_remarks:
             old_row = previous_by_name.get(row.name)
-            if old_row and old_row.is_locked:
-                protected = ("field_reference", "is_verified", "remark", "verified_by", "verified_on")
+            if old_row and old_row.get("is_locked"):
+                protected = (
+                    "field_reference", "field_value", "is_verified", "remark",
+                    "verified_by", "verified_on",
+                )
                 if any(getattr(row, field) != getattr(old_row, field) for field in protected):
                     frappe.throw(_("Locked verification remarks cannot be changed."))
 

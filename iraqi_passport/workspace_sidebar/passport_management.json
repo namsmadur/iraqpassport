@@ -1,0 +1,47 @@
+{
+ "app": "iraqi_passport",
+ "doctype": "Workspace Sidebar",
+ "header_icon": "briefcase",
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "briefcase",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "المدير العام",
+   "link_to": "Manager Desk",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "check-circle",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "الضابط",
+   "link_to": "Verification Desk",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "إنشاء جواز عراقي",
+   "link_to": "Applications Desk",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "module": "Passport Management",
+ "name": "Passport Management",
+ "standard": 1,
+ "title": "Passport Management"
+}

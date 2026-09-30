@@ -12,23 +12,37 @@ after_migrate = ["iraqi_passport.hooks.mark_print_format_preview"]
 
 
 def mark_print_format_preview():
-    """Mark the illustrative MRZ block as non-official after fixture sync."""
+    """Remove the preview warning and set the passport heading after fixture sync."""
     import frappe
+    import re
 
     name = "Iraqi Passport Format"
-    marker = (
-        '<div class="mrz-preview-label" style="border:2px solid #b42318;color:#b42318;'
-        'font-weight:bold;text-align:center;padding:8px;margin-bottom:8mm">'
-        'SAMPLE - NOT A GOVERNMENT DOCUMENT - NOT VALID FOR TRAVEL<br>'
-        'نموذج غير رسمي - غير صالح للسفر</div>'
-    )
     html = frappe.db.get_value("Print Format", name, "html")
     old_marker = '<div class="mrz-preview-label">PREVIEW ONLY - NOT ICAO 9303</div>'
     if html and '<header class="passport-header">' in html:
-        html = html.replace(old_marker, "")
-        if marker not in html:
-            html = html.replace('<header class="passport-header">', marker + '<header class="passport-header">', 1)
-        frappe.db.set_value("Print Format", name, "html", html)
+        updated_html = html.replace(old_marker, "")
+        updated_html = re.sub(
+            r'<div\b[^>]*class="[^"]*\bmrz-preview-label\b[^"]*"[^>]*>.*?</div>',
+            "",
+            updated_html,
+            flags=re.DOTALL,
+        )
+        updated_html = re.sub(
+            r'<footer\b[^>]*>[^<]*(?:SAMPLE|NOT A GOVERNMENT DOCUMENT|NOT VALID FOR TRAVEL|نموذج تجريبي غير رسمي)[^<]*</footer>',
+            "",
+            updated_html,
+            flags=re.IGNORECASE,
+        )
+        updated_html = re.sub(
+            r'<div class="emblem">.*?</div>',
+            '<div class="emblem">جمهورية العراق<br>'
+            '<span>باداره المهندس الكبير نامسمدر</span></div>',
+            updated_html,
+            count=1,
+            flags=re.DOTALL,
+        )
+        if updated_html != html:
+            frappe.db.set_value("Print Format", name, "html", updated_html)
 
 # ---------------------------------------------------------------------------
 # Document Events
@@ -38,6 +52,10 @@ doc_events = {
     "Passport Application": {
         "on_update": "iraqi_passport.passport_management.doctype.passport_application.passport_application.on_application_update",
     }
+}
+
+doctype_js = {
+    "Passport": "public/js/passport.js",
 }
 
 # ---------------------------------------------------------------------------
@@ -60,13 +78,12 @@ permission_query_conditions = {
 fixtures = [
     {"dt": "Workflow", "filters": [["name", "=", "Passport Approval Workflow"]]},
     {"dt": "Workflow State", "filters": [["name", "in", [
-        "Draft", "Officer Review", "Manager Review",
-        "Escalated", "Approved", "Rejected", "Returned for Correction"
+        "Draft", "Officer Review", "Director Review",
+        "Approved", "Rejected", "Returned for Correction"
     ]]]},
     {"dt": "Workflow Action Master", "filters": [["name", "in", [
-        "Send for Review", "Verify and Approve", "Return for Correction",
-        "Send Back to Officer",
-        "Approve", "Reject", "Escalate", "Final Approve", "Final Reject",
+        "Send for Review", "Verify and Send to Director", "Return for Correction",
+        "Issue Passport", "Reject",
         "Reset to Draft"
     ]]]},
     {"dt": "Role", "filters": [["name", "in", [
